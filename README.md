@@ -122,6 +122,7 @@ mode, `close()` shuts down the browser the SDK started.
 | `waitForLoad(state?, { timeoutMs? })` | Wait for `'load'` / `'domcontentloaded'` / `'networkidle'`. |
 | `waitForElement(selector, { state?, timeoutMs? })` | Wait for an element (default state `'visible'`). Returns a `Locator`. |
 | `extractHtml(selector?, { kind?, timeoutMs? })` | Element `outerHTML` (or `innerHTML` with `kind:'inner'`); full page HTML if no selector. |
+| `screenshot(filePath, { fullPage? })` | Save a PNG of the active page (works headless). Returns the absolute path. |
 | `saveToDisk(content, filePath, { encoding?, mkdirp? })` | Write to disk (creates parent dirs by default). Returns the absolute path. |
 | `extractAndSave(selector, filePath, opts?)` | `extractHtml` + `saveToDisk` in one call. |
 | `newPage()` | Open and activate a fresh blank tab. |
@@ -174,9 +175,36 @@ CDP_ENDPOINT=http://localhost:9222 npm run example:connect
 ```
 
 The connect example detaches on `close()`, so the navigated tab stays in the
-window. (On a headless Linux VM with no display, a visible window needs a
-display server such as Xvfb — e.g. `xvfb-run ./chrome-remote-debug.sh` — or a
-VNC desktop; without one there is nothing to render the tab onto.)
+window.
+
+### Remote / headless server (no display)
+
+On a remote box with **no display server**, a *windowed* Chrome has nothing to
+draw onto — so it looks like "the tab never gets created" even though the page
+is actually there and drivable. The helper detects this (Linux, no `DISPLAY`)
+and **runs headless automatically**; the CDP endpoint, tabs, HTML extraction,
+and screenshots all still work — you just can't watch a window.
+
+```bash
+./chrome-remote-debug.sh                          # auto-headless on a display-less box
+CDP_ENDPOINT=http://localhost:9222 npm run example:connect
+# → writes output/existing-window.html AND output/existing-window.png
+```
+
+The connect example saves a **screenshot** (`driver.screenshot(...)`) as visual
+proof the tab was created and rendered, even with no display. The script also
+prints the live page targets so you can confirm the tab exists:
+`curl -s http://localhost:9222/json/list`.
+
+To actually **see** a window on a headless Linux box, give it a virtual display
+and force a window:
+
+```bash
+xvfb-run -a env CHROME_FORCE_HEADED=1 ./chrome-remote-debug.sh
+```
+
+Toggles: `CHROME_HEADLESS=1` forces headless anywhere; `CHROME_FORCE_HEADED=1`
+forces a window (pair with `xvfb-run` / a VNC desktop).
 
 ## Scripts
 

@@ -273,6 +273,29 @@ export class BrowserDriver {
   }
 
   /**
+   * Capture a PNG screenshot of the active page and save it to `filePath`.
+   * Works even in headless / no-display environments — handy on a remote box
+   * where you can't see the window but still want visual proof the tab loaded.
+   * Returns the absolute path written.
+   */
+  async screenshot(
+    filePath: string,
+    options: { fullPage?: boolean } = {},
+  ): Promise<string> {
+    const page = this.requirePage();
+    const absolutePath = resolve(filePath);
+    try {
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await page.screenshot({ path: absolutePath, fullPage: options.fullPage ?? true });
+    } catch (cause) {
+      throw new BrowserDriverError('SAVE_FAILED', `Failed to screenshot to "${absolutePath}".`, {
+        cause,
+      });
+    }
+    return absolutePath;
+  }
+
+  /**
    * Convenience: wait for `selector`, extract its HTML, and save it to
    * `filePath` in one call. Returns the absolute path written.
    */

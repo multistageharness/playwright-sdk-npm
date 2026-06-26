@@ -49,6 +49,11 @@ async function main(): Promise<void> {
   const savedPath = await driver.extractAndSave(SELECTOR, OUT);
   console.log(`Saved ${SELECTOR} HTML → ${savedPath}`);
 
+  // Visual proof the tab was created and rendered — works even with no display
+  // (e.g. a remote/headless box where you can't see the window).
+  const shotPath = await driver.screenshot(OUT.replace(/\.html?$/i, '') + '.png');
+  console.log(`Saved screenshot → ${shotPath}`);
+
   if (HOLD) {
     console.log('Tab is open and focused. Press Ctrl+C to detach (Chrome stays open).');
     await new Promise<void>((resolve) => {

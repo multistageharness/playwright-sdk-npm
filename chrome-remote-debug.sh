@@ -85,7 +85,29 @@ FLAGS=(
   "--start-maximized"
 )
 
-echo "chrome-remote-debug: launching ${BIN}" >&2
+# ---------------------------------------------------------------------------
+# Decide headless vs windowed.
+#   CHROME_HEADLESS=1     force headless (no window; still fully drivable).
+#   CHROME_FORCE_HEADED=1 force a window even with no display (e.g. xvfb-run).
+# On a remote/headless Linux box with NO display, a windowed Chrome cannot draw
+# anything — so default to headless there (otherwise the tab "never appears").
+# ---------------------------------------------------------------------------
+MODE="windowed"
+if [ "${CHROME_HEADLESS:-}" = "1" ]; then
+  MODE="headless"
+elif [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] \
+     && [ "${CHROME_FORCE_HEADED:-}" != "1" ]; then
+  echo "chrome-remote-debug: no display detected (Linux) — running headless." >&2
+  echo "chrome-remote-debug:   to SEE a window, run under a virtual display:" >&2
+  echo "chrome-remote-debug:     xvfb-run -a env CHROME_FORCE_HEADED=1 ./chrome-remote-debug.sh ${PORT}" >&2
+  MODE="headless"
+fi
+if [ "${MODE}" = "headless" ]; then
+  # New headless still serves CDP and creates real tabs; just no on-screen window.
+  FLAGS+=("--headless=new" "--window-size=1280,1024")
+fi
+
+echo "chrome-remote-debug: launching ${BIN} (${MODE})" >&2
 echo "chrome-remote-debug:   port    = ${PORT}" >&2
 echo "chrome-remote-debug:   profile = ${PROFILE}" >&2
 
@@ -139,6 +161,12 @@ echo "  profile      = ${PROFILE}"
 echo "  cdp endpoint = ${CDP_ENDPOINT}"
 echo "  ws endpoint  = ${WS_URL}"
 echo "  session id   = ${SESSION_ID}"
+echo "  mode         = ${MODE}"
+echo ""
+echo "Open page targets (tabs):"
+curl -fsS "http://localhost:${PORT}/json/list" \
+  | sed -n 's/.*"url": "\([^"]*\)".*/  - \1/p' \
+  | grep -v '^  - chrome-extension://' || echo "  (none yet — the connect example will create one)"
 echo ""
 echo "Use it with the SDK examples (mode: 'connect'):"
 echo "  CDP_ENDPOINT=${CDP_ENDPOINT} npm run example:connect"
