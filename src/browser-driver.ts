@@ -169,6 +169,10 @@ export class BrowserDriver {
     const page = this.requirePage();
     const waitUntil: LoadState = options.waitUntil ?? 'load';
     const timeout = options.timeoutMs ?? this.options.defaultTimeoutMs;
+    // Activate the tab first so the navigation is visible in the window.
+    if (options.bringToFront) {
+      await page.bringToFront();
+    }
     try {
       await page.goto(url, { waitUntil, timeout });
     } catch (cause) {
@@ -290,6 +294,14 @@ export class BrowserDriver {
     if (!this.context) throw new NotLaunchedError();
     this.page = await this.context.newPage();
     return this.page;
+  }
+
+  /**
+   * Bring the active tab to the foreground of its window (CDP `Page.bringToFront`).
+   * Useful when connected to a real Chrome so the driven tab is the one you see.
+   */
+  async bringToFront(): Promise<void> {
+    await this.requirePage().bringToFront();
   }
 
   /** The active page, or throw if there isn't one. Use for advanced Playwright calls. */

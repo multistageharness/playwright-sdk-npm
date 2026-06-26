@@ -75,19 +75,25 @@ start Chrome with remote debugging enabled, then connect over CDP.
    const driver = new BrowserDriver({
      mode: 'connect',
      cdpEndpoint: process.env.CDP_ENDPOINT ?? 'http://localhost:9222',
-     reuseExistingPage: true,   // drive the tab you already have open
+     reuseExistingPage: false,  // open a NEW tab in the active window
    });
    await driver.launch();
-   await driver.openUrl('https://example.com');
+   // bringToFront focuses the tab so you can watch it load (active debugging).
+   await driver.openUrl('https://example.com', { bringToFront: true });
    await driver.extractAndSave('h1', 'output/from-existing-window.html');
-   await driver.close();        // detaches only — your Chrome stays open
+   await driver.close();        // detaches only — your Chrome and the tab stay open
    ```
 
-   Or run the bundled example against the printed endpoint:
+   Or run the bundled example against the printed endpoint (http or ws):
 
    ```bash
    CDP_ENDPOINT=http://localhost:9222 npm run example:connect
    ```
+
+   The example opens a **new tab in the active window**, brings it to the
+   **foreground**, and holds the connection open until you press **Ctrl+C** so
+   you can debug it live. Env toggles: `REUSE_TAB=1` drives the current tab
+   instead of opening a new one; `HOLD=0` detaches immediately after saving.
 
 In `connect` mode, `close()` detaches without killing your browser. In `launch`
 mode, `close()` shuts down the browser the SDK started.
@@ -112,13 +118,14 @@ mode, `close()` shuts down the browser the SDK started.
 | Method | Description |
 | ------ | ----------- |
 | `launch()` | Acquire the browser per `mode`. Idempotent. Returns `this`. |
-| `openUrl(url, { waitUntil?, timeoutMs? })` | Navigate and wait for a lifecycle event (default `'load'`). Returns the `Page`. |
+| `openUrl(url, { waitUntil?, timeoutMs?, bringToFront? })` | Navigate and wait for a lifecycle event (default `'load'`). `bringToFront: true` focuses the tab first. Returns the `Page`. |
 | `waitForLoad(state?, { timeoutMs? })` | Wait for `'load'` / `'domcontentloaded'` / `'networkidle'`. |
 | `waitForElement(selector, { state?, timeoutMs? })` | Wait for an element (default state `'visible'`). Returns a `Locator`. |
 | `extractHtml(selector?, { kind?, timeoutMs? })` | Element `outerHTML` (or `innerHTML` with `kind:'inner'`); full page HTML if no selector. |
 | `saveToDisk(content, filePath, { encoding?, mkdirp? })` | Write to disk (creates parent dirs by default). Returns the absolute path. |
 | `extractAndSave(selector, filePath, opts?)` | `extractHtml` + `saveToDisk` in one call. |
 | `newPage()` | Open and activate a fresh blank tab. |
+| `bringToFront()` | Bring the active tab to the foreground of its window. |
 | `close()` | Close (launch) or detach (connect). |
 
 ### Accessors & escape hatches
@@ -142,6 +149,34 @@ npm run example:connect  # same flow against your existing Chrome window
 ```
 
 Both honor `TARGET_URL`, `TARGET_SELECTOR`, and `OUT_FILE` env vars.
+
+By default `npm run example` **leaves the window open** so you can see the
+loaded tab, and waits until you press **Ctrl+C**. Otherwise the browser
+navigates and closes in a split second — on a virtual/remote desktop the tab
+just flashes by and you never see it. Control this with:
+
+```bash
+HOLD_MS=0   npm run example   # close immediately after saving
+HOLD_MS=5000 npm run example   # keep the tab open for 5s, then close
+HEADLESS=1  npm run example   # no window at all
+```
+
+### Seeing / keeping the tab on a virtual computer
+
+A **launch-mode** browser is a child of the Node process, so it is torn down
+when the script exits — it cannot outlive the terminal. For a window that loads
+a tab **and stays open** (even after the terminal closes), launch a persistent
+Chrome with the helper and drive it via `connect`:
+
+```bash
+./chrome-remote-debug.sh                       # opens a persistent Chrome window
+CDP_ENDPOINT=http://localhost:9222 npm run example:connect
+```
+
+The connect example detaches on `close()`, so the navigated tab stays in the
+window. (On a headless Linux VM with no display, a visible window needs a
+display server such as Xvfb — e.g. `xvfb-run ./chrome-remote-debug.sh` — or a
+VNC desktop; without one there is nothing to render the tab onto.)
 
 ## Scripts
 

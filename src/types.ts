@@ -63,6 +63,12 @@ export interface OpenUrlOptions {
 
   /** Per-call navigation timeout (ms). Falls back to the driver default. */
   timeoutMs?: number;
+
+  /**
+   * Activate (focus) the tab in its window before navigating, so you can watch
+   * it load — useful for live/visible debugging. Defaults to `false`.
+   */
+  bringToFront?: boolean;
 }
 
 export interface WaitForElementOptions {
