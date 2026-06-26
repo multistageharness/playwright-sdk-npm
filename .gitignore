@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+
+# Local test-data & secrets (see user conventions)
+.env.testdata
+
+# Example output written by the SDK
+output/
+*.local.html

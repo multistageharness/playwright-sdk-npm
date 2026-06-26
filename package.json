@@ -1,0 +1,46 @@
+{
+  "name": "playwright-sdk-npm",
+  "version": "0.1.0",
+  "description": "A small TypeScript SDK that launches (or connects to) Playwright and provides a high-level interface for driving a browser: open a URL, wait for load, wait for an element, extract its HTML, and save it to disk.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "example": "tsx examples/extract-element.ts",
+    "example:connect": "tsx examples/connect-existing-chrome.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "playwright",
+    "sdk",
+    "browser",
+    "automation",
+    "scraping",
+    "cdp",
+    "typescript"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "1.61.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.1",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
