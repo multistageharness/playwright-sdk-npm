@@ -21,7 +21,8 @@ npx playwright install chromium   # one-time: download the browser binary
 ```ts
 import { BrowserDriver } from 'playwright-sdk-npm';
 
-const driver = new BrowserDriver({ headless: true });
+// A visible Chromium window opens by default; pass { headless: true } to hide it.
+const driver = new BrowserDriver();
 
 await driver.launch();
 await driver.openUrl('https://example.com', { waitUntil: 'load' });
@@ -61,7 +62,9 @@ start Chrome with remote debugging enabled, then connect over CDP.
      session id   = <session-id>
    ```
 
-   Stop it later with `./chrome-remote-debug.sh stop 9222`.
+   The launched Chrome is detached (`nohup` + `disown`), so it **stays open
+   after the terminal closes**. Stop it explicitly with
+   `./chrome-remote-debug.sh stop 9222`.
 
    > Override the binary with `CHROME_BIN=...` and the profile with
    > `CHROME_DEBUG_PROFILE=...` if needed.
@@ -97,7 +100,7 @@ mode, `close()` shuts down the browser the SDK started.
 | ------------------- | ------------------------------------- | ------------------------- | ----- |
 | `mode`              | `'launch' \| 'connect'`               | `'launch'`                | Launch a fresh browser, or attach to an existing Chrome over CDP. |
 | `engine`            | `'chromium' \| 'firefox' \| 'webkit'` | `'chromium'`              | Launch mode only. |
-| `headless`          | `boolean`                             | `true`                    | Launch mode only. |
+| `headless`          | `boolean`                             | `false`                   | Launch mode only. `false` opens a visible window. |
 | `cdpEndpoint`       | `string`                              | `'http://localhost:9222'` | Connect mode only. |
 | `reuseExistingPage` | `boolean`                             | `true`                    | Connect mode: drive the open tab instead of opening a new one. |
 | `defaultTimeoutMs`  | `number`                              | `30000`                   | Applied to navigation and waits. |

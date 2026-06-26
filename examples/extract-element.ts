@@ -11,7 +11,12 @@ const SELECTOR = process.env.TARGET_SELECTOR ?? 'h1';
 const OUT = process.env.OUT_FILE ?? 'output/element.html';
 
 async function main(): Promise<void> {
-  const driver = new BrowserDriver({ mode: 'launch', headless: true });
+  // Non-headless: a real Chromium window opens and the tab loads visibly.
+  // Set HEADLESS=1 to run without a window.
+  const driver = new BrowserDriver({
+    mode: 'launch',
+    headless: process.env.HEADLESS === '1',
+  });
 
   await driver.launch();
   console.log(`Launched. Opening ${URL} …`);

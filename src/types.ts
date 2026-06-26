@@ -27,7 +27,7 @@ export interface DriverOptions {
   /** Engine to launch. Only applies to `mode: 'launch'`. Defaults to `'chromium'`. */
   engine?: BrowserEngine;
 
-  /** Run with no visible window. Only applies to `mode: 'launch'`. Defaults to `true`. */
+  /** Run with no visible window. Only applies to `mode: 'launch'`. Defaults to `false` (a visible window opens). */
   headless?: boolean;
 
   /**

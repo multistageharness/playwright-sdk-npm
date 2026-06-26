@@ -89,9 +89,17 @@ echo "chrome-remote-debug: launching ${BIN}" >&2
 echo "chrome-remote-debug:   port    = ${PORT}" >&2
 echo "chrome-remote-debug:   profile = ${PROFILE}" >&2
 
-# Launch windowed (non-headless) in the background.
-"${BIN}" "${FLAGS[@]}" >"${PROFILE}/chrome.log" 2>&1 &
+# Launch windowed (non-headless) and fully detach it so it survives the
+# terminal closing:
+#   nohup        — ignore SIGHUP (sent to the session on terminal close)
+#   </dev/null   — detach stdin so it isn't tied to the tty
+#   >log 2>&1    — detach stdout/stderr
+#   disown       — drop it from the shell's job table (no SIGHUP on shell exit)
+# Together these reparent Chrome to launchd/init, so it keeps running after the
+# launching terminal is gone. Stop it explicitly with `stop`.
+nohup "${BIN}" "${FLAGS[@]}" >"${PROFILE}/chrome.log" 2>&1 </dev/null &
 CHROME_PID=$!
+disown "${CHROME_PID}" 2>/dev/null || disown 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Wait for the CDP endpoint, then read the browser session from /json/version.
@@ -137,4 +145,5 @@ echo "  CDP_ENDPOINT=${CDP_ENDPOINT} npm run example:connect"
 echo "  # or attach directly to this session:"
 echo "  CDP_ENDPOINT='${WS_URL}' npm run example:connect"
 echo ""
+echo "Chrome is detached — it stays open after this terminal closes."
 echo "Stop it with:  ./chrome-remote-debug.sh stop ${PORT}"

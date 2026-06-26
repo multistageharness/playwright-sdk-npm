@@ -65,7 +65,7 @@ export class BrowserDriver {
     this.options = {
       mode: options.mode ?? 'launch',
       engine: options.engine ?? 'chromium',
-      headless: options.headless ?? true,
+      headless: options.headless ?? false,
       cdpEndpoint: options.cdpEndpoint ?? DEFAULT_CDP_ENDPOINT,
       reuseExistingPage: options.reuseExistingPage ?? true,
       defaultTimeoutMs: options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS,
