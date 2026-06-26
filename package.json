@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p examples/tsconfig.json",
     "example": "tsx examples/extract-element.ts",
     "example:connect": "tsx examples/connect-existing-chrome.ts",
     "prepublishOnly": "npm run build"

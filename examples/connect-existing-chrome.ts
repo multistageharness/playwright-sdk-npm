@@ -1,22 +1,19 @@
 /**
  * Drives your *existing* Chrome window instead of launching a fresh browser.
  *
- * 1. Quit Chrome completely, then start it with remote debugging enabled:
+ * 1. Start a windowed Chrome with remote debugging enabled. The bundled helper
+ *    does this and prints a session id + CDP endpoint to use:
  *
- *      macOS:
- *        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
- *          --remote-debugging-port=9222
+ *      ./chrome-remote-debug.sh            # default port 9222
  *
- *      Linux:
- *        google-chrome --remote-debugging-port=9222
+ * 2. Run this example, pointing it at the printed endpoint:
  *
- *      Windows:
- *        "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
- *
- * 2. Run:  npm run example:connect
+ *      CDP_ENDPOINT=http://localhost:9222 npm run example:connect
  *
  * Because the driver connected (rather than launched), close() detaches and
- * leaves your Chrome window open.
+ * leaves your Chrome window open. Stop Chrome with:
+ *
+ *      ./chrome-remote-debug.sh stop 9222
  */
 import { BrowserDriver } from '../src/index.js';
 

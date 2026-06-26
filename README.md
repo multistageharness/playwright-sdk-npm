@@ -39,32 +39,51 @@ await driver.extractAndSave('h1', 'output/heading.html');
 
 ## Driving your existing Chrome window
 
-To control the Chrome you already have open (rather than launching a new one),
+To control a real Chrome window (rather than launching a fresh, isolated one),
 start Chrome with remote debugging enabled, then connect over CDP.
 
-1. Quit Chrome completely, then relaunch it with a debugging port:
+1. Launch a windowed Chrome with the bundled helper. It applies
+   `--remote-debugging-port`, an isolated `--user-data-dir`, `--no-first-run`,
+   and `--start-maximized` (non-headless), waits for the endpoint, and prints a
+   **session id** plus the endpoint to use:
 
    ```bash
-   # macOS
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222
-   # Linux
-   google-chrome --remote-debugging-port=9222
-   # Windows
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+   ./chrome-remote-debug.sh          # default port 9222
+   # ./chrome-remote-debug.sh 9333   # custom port
    ```
 
-2. Connect and drive the already-open tab:
+   ```text
+   chrome-remote-debug: session ready
+     pid          = 12345
+     port         = 9222
+     cdp endpoint = http://localhost:9222
+     ws endpoint  = ws://localhost:9222/devtools/browser/<session-id>
+     session id   = <session-id>
+   ```
+
+   Stop it later with `./chrome-remote-debug.sh stop 9222`.
+
+   > Override the binary with `CHROME_BIN=...` and the profile with
+   > `CHROME_DEBUG_PROFILE=...` if needed.
+
+2. Connect and drive the already-open tab, pointing at the printed endpoint:
 
    ```ts
    const driver = new BrowserDriver({
      mode: 'connect',
-     cdpEndpoint: 'http://localhost:9222',
+     cdpEndpoint: process.env.CDP_ENDPOINT ?? 'http://localhost:9222',
      reuseExistingPage: true,   // drive the tab you already have open
    });
    await driver.launch();
    await driver.openUrl('https://example.com');
    await driver.extractAndSave('h1', 'output/from-existing-window.html');
    await driver.close();        // detaches only — your Chrome stays open
+   ```
+
+   Or run the bundled example against the printed endpoint:
+
+   ```bash
+   CDP_ENDPOINT=http://localhost:9222 npm run example:connect
    ```
 
 In `connect` mode, `close()` detaches without killing your browser. In `launch`
