@@ -98,6 +98,31 @@ start Chrome with remote debugging enabled, then connect over CDP.
 In `connect` mode, `close()` detaches without killing your browser. In `launch`
 mode, `close()` shuts down the browser the SDK started.
 
+## Strict CSP pages (no `unsafe-eval`)
+
+Sites with a strict Content-Security-Policy can break tools that inject or
+`eval()` script in the page. This SDK is CSP-friendly two ways:
+
+1. **Eval-free extraction.** `extractHtml` reads markup without running any page
+   script — `outerHTML` comes from the CDP `DOM.getOuterHTML` domain and
+   `kind: 'inner'` uses native `innerHTML`. So extraction works even with
+   `bypassCSP: false`. (Playwright engine selectors like `text=`/`xpath=` fall
+   back to an isolated-world `evaluate`, which is itself exempt from page CSP.)
+2. **`bypassCSP: true` (default).** Disables the page CSP for the automated
+   session so any scripts you inject also run. Applied via `newContext({
+   bypassCSP })` in launch mode and CDP `Page.setBypassCSP` in connect mode.
+
+```ts
+const driver = new BrowserDriver();          // bypassCSP defaults to true
+await driver.launch();
+await driver.openUrl('https://strict-csp.example');
+const html = await driver.extractHtml('#app'); // eval-free, no CSP violation
+```
+
+```bash
+npm run example:csp   # demonstrates extraction from a strict-CSP fixture
+```
+
 ## API
 
 ### `new BrowserDriver(options?)`
@@ -110,6 +135,7 @@ mode, `close()` shuts down the browser the SDK started.
 | `cdpEndpoint`       | `string`                              | `'http://localhost:9222'` | Connect mode only. |
 | `reuseExistingPage` | `boolean`                             | `true`                    | Connect mode: drive the open tab instead of opening a new one. |
 | `defaultTimeoutMs`  | `number`                              | `30000`                   | Applied to navigation and waits. |
+| `bypassCSP`         | `boolean`                             | `true`                    | Disable the page CSP for the session (launch: context option; connect: CDP `Page.setBypassCSP`). |
 | `userAgent`         | `string`                              | —                         | Launch mode only. |
 | `args`              | `string[]`                            | —                         | Extra browser process args (launch mode). |
 
@@ -147,6 +173,7 @@ All thrown errors extend `BrowserDriverError` and carry a `.code`
 ```bash
 npm run example          # launch → open → wait → extract → save
 npm run example:connect  # same flow against your existing Chrome window
+npm run example:csp      # extract from a strict-CSP page (no unsafe-eval)
 ```
 
 Both honor `TARGET_URL`, `TARGET_SELECTOR`, and `OUT_FILE` env vars.

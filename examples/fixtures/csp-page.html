@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- Strict CSP: no 'unsafe-eval', no remote scripts. Mirrors a hardened site. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+  <title>CSP-Locked Page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; color: #36454f; margin: 2rem; }
+    .card { border: 1px solid #d3d3d3; border-radius: 8px; padding: 1rem; max-width: 32rem; }
+    h1 { color: #36454f; }
+    p { color: #708090; }
+  </style>
+</head>
+<body>
+  <h1 id="headline">Content extracted under a strict CSP</h1>
+  <section class="card" data-testid="summary">
+    <p>This page forbids <code>unsafe-eval</code>. The SDK still extracts this
+       markup because it reads the DOM over CDP instead of running page script.</p>
+  </section>
+</body>
+</html>

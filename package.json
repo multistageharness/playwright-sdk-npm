@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p examples/tsconfig.json",
     "example": "tsx examples/extract-element.ts",
     "example:connect": "tsx examples/connect-existing-chrome.ts",
+    "example:csp": "tsx examples/csp-extract.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

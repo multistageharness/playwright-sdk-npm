@@ -37,6 +37,23 @@ const ENGINES: Record<NonNullable<DriverOptions['engine']>, BrowserType> = {
 };
 
 /**
+ * Conservatively decide whether a selector is a plain CSS selector that the CDP
+ * `DOM.querySelector` can resolve. Playwright engine selectors (text=, xpath=,
+ * chained `>>`, `:has-text(...)`, etc.) are not CSS — those fall back to the
+ * isolated-world evaluate path.
+ */
+function isPlainCssSelector(selector: string): boolean {
+  const s = selector.trim();
+  if (/^(text|xpath|css|id|data-testid|role|internal:)\s*=/i.test(s)) return false;
+  if (s.startsWith('//') || s.startsWith('..')) return false; // xpath
+  if (s.includes('>>')) return false; // chained engines
+  if (/:(has-text|text|visible|nth-match|has|near|right-of|left-of|above|below)\b/.test(s)) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * High-level wrapper around Playwright that exposes a small, task-focused API:
  * launch (or connect to) a browser, open a URL, wait for it / for an element,
  * extract HTML, and save it to disk.
@@ -53,7 +70,10 @@ const ENGINES: Record<NonNullable<DriverOptions['engine']>, BrowserType> = {
  */
 export class BrowserDriver {
   private readonly options: Required<
-    Pick<DriverOptions, 'mode' | 'engine' | 'headless' | 'cdpEndpoint' | 'reuseExistingPage' | 'defaultTimeoutMs'>
+    Pick<
+      DriverOptions,
+      'mode' | 'engine' | 'headless' | 'cdpEndpoint' | 'reuseExistingPage' | 'defaultTimeoutMs' | 'bypassCSP'
+    >
   > &
     DriverOptions;
 
@@ -69,6 +89,7 @@ export class BrowserDriver {
       cdpEndpoint: options.cdpEndpoint ?? DEFAULT_CDP_ENDPOINT,
       reuseExistingPage: options.reuseExistingPage ?? true,
       defaultTimeoutMs: options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS,
+      bypassCSP: options.bypassCSP ?? true,
       userAgent: options.userAgent,
       args: options.args,
     };
@@ -112,7 +133,10 @@ export class BrowserDriver {
         { cause },
       );
     }
-    this.context = await this.browser.newContext({ userAgent: this.options.userAgent });
+    this.context = await this.browser.newContext({
+      userAgent: this.options.userAgent,
+      bypassCSP: this.options.bypassCSP,
+    });
     this.page = await this.context.newPage();
   }
 
@@ -137,6 +161,22 @@ export class BrowserDriver {
       this.page = this.context.pages()[0] ?? (await this.context.newPage());
     } else {
       this.page = await this.context.newPage();
+    }
+
+    // launch mode sets bypassCSP at context creation; over CDP the context
+    // already exists, so disable CSP per page via the protocol instead.
+    if (this.options.bypassCSP) {
+      await this.enableCspBypassViaCdp(this.page);
+    }
+  }
+
+  /** Disable CSP for a connected page (Chromium CDP). Safe no-op on failure. */
+  private async enableCspBypassViaCdp(page: Page): Promise<void> {
+    try {
+      const session = await this.context!.newCDPSession(page);
+      await session.send('Page.setBypassCSP', { enabled: true });
+    } catch {
+      // Non-Chromium or unsupported — leave the page's CSP in effect.
     }
   }
 
@@ -244,9 +284,43 @@ export class BrowserDriver {
     }
 
     const kind = options.kind ?? 'outer';
-    return kind === 'inner'
-      ? await locator.innerHTML({ timeout })
-      : await locator.evaluate((el) => (el as Element).outerHTML);
+    if (kind === 'inner') {
+      // Native, eval-free — never trips a CSP `unsafe-eval` policy.
+      return locator.innerHTML({ timeout });
+    }
+
+    // outerHTML, eval-free: read it straight from the CDP DOM domain (no script
+    // runs in the page, so a strict CSP is irrelevant). Only safe for plain CSS
+    // selectors; for Playwright engine selectors fall back to isolated-world
+    // evaluate (which is itself exempt from page CSP).
+    if (isPlainCssSelector(selector)) {
+      const viaCdp = await this.outerHtmlViaCdp(page, selector);
+      if (viaCdp !== null) return viaCdp;
+    }
+    return locator.evaluate((el) => (el as Element).outerHTML);
+  }
+
+  /** Read an element's outerHTML via CDP `DOM.getOuterHTML`. Null if unavailable. */
+  private async outerHtmlViaCdp(page: Page, cssSelector: string): Promise<string | null> {
+    if (!this.context) return null;
+    try {
+      const session = await this.context.newCDPSession(page);
+      const { root } = (await session.send('DOM.getDocument', { depth: 0 })) as {
+        root: { nodeId: number };
+      };
+      const { nodeId } = (await session.send('DOM.querySelector', {
+        nodeId: root.nodeId,
+        selector: cssSelector,
+      })) as { nodeId: number };
+      if (!nodeId) return null;
+      const { outerHTML } = (await session.send('DOM.getOuterHTML', { nodeId })) as {
+        outerHTML: string;
+      };
+      return outerHTML;
+    } catch {
+      // Non-Chromium, detached, or protocol error — let the caller fall back.
+      return null;
+    }
   }
 
   /**

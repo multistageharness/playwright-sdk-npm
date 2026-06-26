@@ -47,6 +47,20 @@ export interface DriverOptions {
   /** Default timeout (ms) applied to navigation and waits. Defaults to 30000. */
   defaultTimeoutMs?: number;
 
+  /**
+   * Disable the page's Content-Security-Policy for the automated session so
+   * injected scripts / `evaluate` are never blocked by an `unsafe-eval`
+   * policy. Defaults to `true` (CSP-friendly).
+   *
+   * - launch mode  → applied via `newContext({ bypassCSP: true })`.
+   * - connect mode → applied per page via CDP `Page.setBypassCSP`.
+   *
+   * Note: the SDK's HTML extraction is already eval-free (it uses the CDP DOM
+   * domain / native `innerHTML`), so extraction works even with `bypassCSP:
+   * false`; this option only matters if you (or the page) inject scripts.
+   */
+  bypassCSP?: boolean;
+
   /** User-Agent override for newly created contexts (launch mode only). */
   userAgent?: string;
 
