@@ -171,12 +171,28 @@ All thrown errors extend `BrowserDriverError` and carry a `.code`
 ## Examples
 
 ```bash
-npm run example          # launch → open → wait → extract → save
+npm run example          # launch → open → wait → extract OUTER html → save
 npm run example:connect  # same flow against your existing Chrome window
-npm run example:csp      # extract from a strict-CSP page (no unsafe-eval)
+npm run example:csp      # CSP-friendly extraction from the configured URL
 ```
 
-Both honor `TARGET_URL`, `TARGET_SELECTOR`, and `OUT_FILE` env vars.
+All three extract the **outer HTML** of the selected element and share one set
+of details from [`examples/config.mjs`](examples/config.mjs), so they always
+target the same page/selector. Override any value with an env var:
+
+| Env | Default | Meaning |
+| --- | ------- | ------- |
+| `TARGET_URL` | `https://example.com` | Page to open. |
+| `TARGET_SELECTOR` | `h1` | Element whose outer HTML is extracted. |
+| `HTML_KIND` | `outer` | `outer` (outerHTML) or `inner` (innerHTML). |
+| `CDP_ENDPOINT` | `http://localhost:9222` | Endpoint for the connect example. |
+| `HEADLESS` | _(unset)_ | `1` to launch headless. |
+| `OUT_DIR` | `output` | Directory for saved files. |
+
+```bash
+# Same shared config drives every example:
+TARGET_URL='https://strict-csp.example' TARGET_SELECTOR='#app' npm run example:csp
+```
 
 By default `npm run example` **leaves the window open** so you can see the
 loaded tab, and waits until you press **Ctrl+C**. Otherwise the browser
