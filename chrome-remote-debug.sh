@@ -36,6 +36,22 @@ find_chrome() {
     return 0
   fi
 
+  # Prefer the Playwright-bundled "Google Chrome for Testing" when present.
+  # It has a distinct app identity, so macOS does NOT merge its launch into an
+  # already-running Google Chrome — --remote-debugging-port opens the CDP
+  # endpoint reliably even when your normal Chrome is already running.
+  local pw_cache="${HOME}/Library/Caches/ms-playwright"
+  if [ -d "${pw_cache}" ]; then
+    local cft
+    cft="$(ls -dt \
+      "${pw_cache}"/chromium-*/chrome-mac*/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing" \
+      2>/dev/null | head -n 1 || true)"
+    if [ -n "${cft}" ] && [ -x "${cft}" ]; then
+      printf '%s\n' "${cft}"
+      return 0
+    fi
+  fi
+
   local candidates=(
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary"
@@ -74,6 +90,33 @@ if [ "${1:-}" = "stop" ]; then
 fi
 
 BIN="$(find_chrome)"
+
+# ---------------------------------------------------------------------------
+# macOS pre-launch guard.
+# Launching a *regular* Google Chrome while one is already running hands the new
+# process off to the existing instance ("Opening in existing browser session")
+# and silently ignores --remote-debugging-port, so the CDP endpoint never opens
+# and we'd time out. Fail fast with a fix instead. "Chrome for Testing" has a
+# separate app identity and is exempt. Bypass entirely with CHROME_SKIP_CHECK=1.
+# ---------------------------------------------------------------------------
+if [ "$(uname -s)" = "Darwin" ] && [ "${CHROME_SKIP_CHECK:-}" != "1" ]; then
+  case "${BIN}" in
+    *"Chrome for Testing"*|*"ms-playwright"*) : ;; # separate identity — safe
+    *)
+      if pgrep -x "Google Chrome" >/dev/null 2>&1; then
+        echo "chrome-remote-debug: Google Chrome is already running." >&2
+        echo "chrome-remote-debug:   Launching regular Chrome now would merge into the existing" >&2
+        echo "chrome-remote-debug:   session and ignore --remote-debugging-port=${PORT}." >&2
+        echo "chrome-remote-debug:   Quit it first:" >&2
+        echo "chrome-remote-debug:     osascript -e 'tell application \"Google Chrome\" to quit'" >&2
+        echo "chrome-remote-debug:   …or install Chrome for Testing (npx playwright install chromium)," >&2
+        echo "chrome-remote-debug:   or set CHROME_SKIP_CHECK=1 to bypass this check." >&2
+        exit 1
+      fi
+      ;;
+  esac
+fi
+
 PROFILE="${CHROME_DEBUG_PROFILE:-${TMPDIR:-/tmp}/chrome-remote-debug-${PORT}}"
 mkdir -p "${PROFILE}"
 
@@ -146,7 +189,19 @@ for _ in $(seq 1 50); do
 done
 
 if [ -z "${WS_URL}" ]; then
-  echo "chrome-remote-debug: timed out waiting for port ${PORT}; see ${PROFILE}/chrome.log" >&2
+  # Diagnose the common macOS failure: Chrome handed the launch off to an
+  # already-running instance and ignored --remote-debugging-port.
+  if grep -q "Opening in existing browser session" "${PROFILE}/chrome.log" 2>/dev/null; then
+    echo "chrome-remote-debug: Chrome handed off to an already-running instance" >&2
+    echo "chrome-remote-debug:   (\"Opening in existing browser session\") and ignored" >&2
+    echo "chrome-remote-debug:   --remote-debugging-port=${PORT}, so the CDP endpoint never opened." >&2
+    echo "chrome-remote-debug:   Fix: quit the running Chrome and retry —" >&2
+    echo "chrome-remote-debug:     osascript -e 'tell application \"Google Chrome\" to quit'" >&2
+    echo "chrome-remote-debug:   …or use Chrome for Testing (npx playwright install chromium), which" >&2
+    echo "chrome-remote-debug:   macOS does not merge into your running Chrome." >&2
+  else
+    echo "chrome-remote-debug: timed out waiting for port ${PORT}; see ${PROFILE}/chrome.log" >&2
+  fi
   exit 1
 fi
 

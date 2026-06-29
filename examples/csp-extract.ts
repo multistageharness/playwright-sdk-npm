@@ -7,9 +7,14 @@
  *   - `extractHtml(selector, { kind: 'outer' })` reads outerHTML via the CDP DOM
  *     domain (no eval),
  *   - `bypassCSP: true` (the SDK default) additionally disables the page CSP for
- *     the session, so even injected scripts would work.
+ *     the session, so even injected scripts would work. Over a CDP connection
+ *     this is applied per page via `Page.setBypassCSP`.
  *
- * Run with:  npm run example:csp
+ * Two-step workflow (connect to the externally-launched Chrome):
+ *
+ *   1.  ./chrome-remote-debug.sh          # start a windowed Chrome with CDP enabled
+ *   2.  npm run example:csp               # this script connects and drives a fresh tab
+ *
  * Point it at a strict-CSP page to really exercise it, e.g.
  *   TARGET_URL='https://your-strict-csp-site' npm run example:csp
  * A bundled strict-CSP fixture is available too:
@@ -21,12 +26,17 @@ import { config, outPath } from './config.mjs';
 const OUT = outPath('csp-page.html');
 
 async function main(): Promise<void> {
-  // bypassCSP defaults to true; pass { bypassCSP: false } to keep the page CSP
-  // (extraction is eval-free, so it works either way).
-  const driver = new BrowserDriver({ mode: 'launch', headless: config.headless });
+  // Connect-only: attach to the Chrome launched by ./chrome-remote-debug.sh and
+  // drive a fresh tab. bypassCSP defaults to true (applied per page via CDP);
+  // extraction is eval-free, so it works either way.
+  const driver = new BrowserDriver({
+    mode: 'connect',
+    cdpEndpoint: config.cdpEndpoint,
+    reuseExistingPage: false,
+  });
 
   await driver.launch();
-  await driver.openUrl(config.url, { waitUntil: 'load' });
+  await driver.openUrl(config.url, { waitUntil: 'load', bringToFront: true });
   console.log(`Loaded ${config.url} (CSP-friendly, eval-free extraction).`);
 
   await driver.waitForElement(config.selector, { state: 'attached' });
@@ -39,7 +49,7 @@ async function main(): Promise<void> {
   const savedPath = await driver.saveToDisk(outerHtml, OUT);
   console.log(`Saved → ${savedPath}`);
 
-  await driver.close();
+  await driver.close(); // detaches only; your Chrome stays open
 }
 
 main().catch((err) => {

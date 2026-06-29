@@ -6,7 +6,7 @@
  */
 export const config = {
   /** Page to open. (env: TARGET_URL) */
-  url: process.env.TARGET_URL ?? 'https://example.com',
+  url: process.env.TARGET_URL ?? 'https://playwright.dev',
 
   /** Element whose OUTER HTML the examples extract. (env: TARGET_SELECTOR) */
   selector: process.env.TARGET_SELECTOR ?? 'h1',

@@ -8,3 +8,4 @@ dist/
 # Example output written by the SDK
 output/
 *.local.html
+.ai

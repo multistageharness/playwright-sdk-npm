@@ -1,22 +1,23 @@
 /**
  * End-to-end example matching the SDK's core flow:
- *   launch → open URL → wait for load → wait for element → extract OUTER HTML → save.
+ *   connect → open URL → wait for load → wait for element → extract OUTER HTML → save.
  *
- * Shared details (url, selector, headless, output dir) come from ./config.mjs so
- * every example stays consistent.
+ * Shared details (url, selector, cdp endpoint, output dir) come from ./config.mjs
+ * so every example stays consistent.
  *
- * By default the window is left OPEN so you can see the loaded tab — the script
- * waits until you press Ctrl+C. (Without this, the browser navigates and closes
- * in a split second, so on a virtual/remote desktop the tab just "flashes by".)
+ * Two-step workflow (all examples connect to the SAME externally-launched Chrome):
+ *
+ *   1.  ./chrome-remote-debug.sh          # start a windowed Chrome with CDP enabled
+ *   2.  npm run example                   # this script connects and drives a fresh tab
+ *
+ * The example opens a FRESH tab in the running Chrome and brings it to front, so you
+ * can watch it load. Because the driver connected (rather than launched), close()
+ * only detaches — your Chrome window and the opened tab stay open.
  *
  * Env vars:
- *   HOLD_MS=0    close immediately after saving (the old behavior)
- *   HOLD_MS=N    keep the window open for N milliseconds, then close
- *   (see ./config.mjs for TARGET_URL / TARGET_SELECTOR / HEADLESS / OUT_DIR)
- *
- * Note: a launch-mode browser is a child of this Node process, so it closes
- * when the script exits. For a window that persists after the terminal closes,
- * use ./chrome-remote-debug.sh + the connect example instead.
+ *   HOLD_MS=0    detach immediately after saving
+ *   HOLD_MS=N    keep the tab focused for N milliseconds, then detach
+ *   (see ./config.mjs for TARGET_URL / TARGET_SELECTOR / CDP_ENDPOINT / OUT_DIR)
  *
  * Run with:  npm run example
  */
@@ -27,14 +28,19 @@ const OUT = outPath('element.html');
 const HOLD_MS = process.env.HOLD_MS !== undefined ? Number(process.env.HOLD_MS) : null;
 
 async function main(): Promise<void> {
-  // Non-headless by default: a real Chromium window opens and the tab loads
-  // visibly. Set HEADLESS=1 to run without a window.
-  const driver = new BrowserDriver({ mode: 'launch', headless: config.headless });
+  // Connect-only: attach to the Chrome launched by ./chrome-remote-debug.sh and
+  // open a fresh tab to drive (never reuse the user's current tab).
+  const driver = new BrowserDriver({
+    mode: 'connect',
+    cdpEndpoint: config.cdpEndpoint,
+    reuseExistingPage: false,
+  });
 
   await driver.launch();
-  console.log(`Launched. Opening ${config.url} …`);
+  console.log(`Connected. Opening ${config.url} in a fresh tab …`);
 
-  await driver.openUrl(config.url, { waitUntil: 'load' });
+  // bringToFront makes the driven tab the foreground tab so you can watch it load.
+  await driver.openUrl(config.url, { waitUntil: 'load', bringToFront: true });
   await driver.waitForLoad('networkidle');
   console.log('Page loaded.');
 
@@ -49,20 +55,20 @@ async function main(): Promise<void> {
   console.log(`Saved → ${savedPath}`);
 
   if (HOLD_MS === 0) {
-    // HOLD_MS=0 → close immediately.
+    // HOLD_MS=0 → detach immediately.
   } else if (HOLD_MS && HOLD_MS > 0) {
-    console.log(`Holding the window open for ${HOLD_MS}ms …`);
+    console.log(`Holding the tab focused for ${HOLD_MS}ms …`);
     await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
   } else {
-    console.log('Browser is open — the tab is loaded. Press Ctrl+C to close.');
+    console.log('Tab is open and focused. Press Ctrl+C to detach (Chrome stays open).');
     await new Promise<void>((resolve) => {
       process.once('SIGINT', resolve);
       process.once('SIGTERM', resolve);
     });
   }
 
-  await driver.close();
-  console.log('Closed.');
+  await driver.close(); // detaches only; your Chrome and the tab stay open
+  console.log('Detached.');
 }
 
 main().catch((err) => {
