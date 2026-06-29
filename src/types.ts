@@ -70,10 +70,20 @@ export interface DriverOptions {
 
 export interface OpenUrlOptions {
   /**
-   * The lifecycle event to wait for before `openUrl` resolves.
+   * The lifecycle event to wait for during navigation before settling.
    * Defaults to `'load'`.
    */
   waitUntil?: LoadState;
+
+  /**
+   * After navigation, also wait for the network to go fully idle (no
+   * connections for at least 500ms) before `openUrl` resolves — i.e. wait for
+   * the page to *finish* loading, not just fire its `load` event. Defaults to
+   * `true`. Pages that hold long-lived connections (analytics beacons,
+   * websockets, SSE) may never reach idle; rather than fail, `openUrl` proceeds
+   * once the navigation timeout elapses (the DOM is already loaded by then).
+   */
+  waitForNetworkIdle?: boolean;
 
   /** Per-call navigation timeout (ms). Falls back to the driver default. */
   timeoutMs?: number;

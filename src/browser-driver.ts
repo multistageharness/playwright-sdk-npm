@@ -202,8 +202,16 @@ export class BrowserDriver {
   // ---------------------------------------------------------------------------
 
   /**
-   * Navigate the active page to `url` and wait for the requested lifecycle
-   * event (default `'load'`). Returns the active `Page`.
+   * Navigate the active page to `url` and wait for it to finish loading.
+   *
+   * The full settle sequence is:
+   *   1. navigate, waiting for `waitUntil` (default `'load'`), then
+   *   2. wait for the network to go idle (no connections for 500ms) so the page
+   *      is fully loaded — unless `waitForNetworkIdle: false`.
+   *
+   * After this resolves the page is settled; the typical next step is
+   * `waitForElement(selector)` (which returns immediately if the element is
+   * already present). Returns the active `Page`.
    */
   async openUrl(url: string, options: OpenUrlOptions = {}): Promise<Page> {
     const page = this.requirePage();
@@ -221,6 +229,18 @@ export class BrowserDriver {
         `Failed to navigate to "${url}".`,
         { cause },
       );
+    }
+
+    // Wait for the network to fully settle so the page is done loading (not just
+    // past its `load` event). Best-effort: a page that holds a long-lived
+    // connection never reaches 'networkidle', so a timeout here is not fatal —
+    // the DOM is already loaded and the caller's element wait is the real gate.
+    if (options.waitForNetworkIdle ?? true) {
+      try {
+        await page.waitForLoadState('networkidle', { timeout });
+      } catch {
+        // Never idled within the timeout — proceed with the loaded DOM.
+      }
     }
     return page;
   }

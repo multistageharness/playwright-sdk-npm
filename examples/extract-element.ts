@@ -39,11 +39,12 @@ async function main(): Promise<void> {
   await driver.launch();
   console.log(`Connected. Opening ${config.url} in a fresh tab …`);
 
+  // openUrl navigates, then waits for the network to go idle (fully loaded).
   // bringToFront makes the driven tab the foreground tab so you can watch it load.
-  await driver.openUrl(config.url, { waitUntil: 'load', bringToFront: true });
-  await driver.waitForLoad('networkidle');
-  console.log('Page loaded.');
+  await driver.openUrl(config.url, { bringToFront: true });
+  console.log('Page loaded (network idle).');
 
+  // Then wait for the target element (returns at once if it's already present).
   await driver.waitForElement(config.selector, { state: 'visible' });
   console.log(`Element "${config.selector}" is visible.`);
 
