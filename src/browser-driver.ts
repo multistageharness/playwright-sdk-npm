@@ -207,7 +207,9 @@ export class BrowserDriver {
    * The full settle sequence is:
    *   1. navigate, waiting for `waitUntil` (default `'load'`), then
    *   2. wait for the network to go idle (no connections for 500ms) so the page
-   *      is fully loaded — unless `waitForNetworkIdle: false`.
+   *      is fully loaded — unless `waitForNetworkIdle: false`, then
+   *   3. defensively confirm `document.readyState === 'complete'` — unless
+   *      `waitForComplete: false`.
    *
    * After this resolves the page is settled; the typical next step is
    * `waitForElement(selector)` (which returns immediately if the element is
@@ -242,7 +244,42 @@ export class BrowserDriver {
         // Never idled within the timeout — proceed with the loaded DOM.
       }
     }
+
+    // Defensive readiness guard. Event-based waits can race: if the page
+    // finished loading before we started listening, the load event is already
+    // gone. A synchronous document.readyState read can't miss it.
+    if (options.waitForComplete ?? true) {
+      await this.waitForDocumentComplete(page, timeout);
+    }
     return page;
+  }
+
+  /**
+   * Ensure `document.readyState === 'complete'`. Reads the state synchronously
+   * first and returns at once if already complete (no event wait, no race);
+   * otherwise waits for it to reach 'complete'. Best-effort — a page that never
+   * completes within the timeout is left to the caller's element wait.
+   *
+   * Note: `page.evaluate` / `waitForFunction` run via the DevTools protocol, so
+   * this readiness check is exempt from the page's CSP (consistent with the
+   * SDK's eval-free extraction).
+   */
+  private async waitForDocumentComplete(page: Page, timeout: number): Promise<void> {
+    let state: DocumentReadyState;
+    try {
+      state = await page.evaluate(() => document.readyState);
+    } catch {
+      // Page navigated/closed mid-check — let the next step surface any error.
+      return;
+    }
+    if (state === 'complete') return; // already done — no wait, no race
+    try {
+      await page.waitForFunction(() => document.readyState === 'complete', undefined, {
+        timeout,
+      });
+    } catch {
+      // Never reached 'complete' in time — proceed; waitForElement is the gate.
+    }
   }
 
   /**

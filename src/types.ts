@@ -85,6 +85,21 @@ export interface OpenUrlOptions {
    */
   waitForNetworkIdle?: boolean;
 
+  /**
+   * After navigation, defensively confirm the document has fully loaded by
+   * checking `document.readyState === 'complete'` (and waiting for it if not
+   * yet). This guards the race where the page finished loading *before* we
+   * started waiting on load events — a synchronous state check can't miss an
+   * event that already fired. Defaults to `true`.
+   *
+   * `document.readyState` is one of:
+   * - `'loading'`     — still parsing the document.
+   * - `'interactive'` — DOM parsed (≈ `DOMContentLoaded`); sub-resources may
+   *                     still be loading.
+   * - `'complete'`    — document *and* all sub-resources loaded (≈ `window.onload`).
+   */
+  waitForComplete?: boolean;
+
   /** Per-call navigation timeout (ms). Falls back to the driver default. */
   timeoutMs?: number;
 
